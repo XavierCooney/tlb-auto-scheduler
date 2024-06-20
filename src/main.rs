@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use clap::Parser;
 use classes::Class;
-use errors::Result;
 use instructor::Instructor;
 use session::{classes_to_sessions, OverlapMatrix, OverlapRequirement};
 use talloc::fetch_applications_value;
 use tsv::Tsv;
 
 mod classes;
-mod errors;
 mod instructor;
 mod session;
 mod talloc;
@@ -52,6 +51,6 @@ fn main_impl() -> Result<()> {
 fn main() {
     match main_impl() {
         Ok(_) => {}
-        Err(err) => println!("\nError: {err}"),
+        Err(err) => println!("\nError: {:?}", err),
     }
 }

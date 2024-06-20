@@ -1,7 +1,7 @@
+use anyhow::{anyhow, bail, Context, Result};
 use itertools::Itertools;
 
 use crate::{
-    errors::{Error, Result},
     tsv::{Tsv, TsvRow},
     utils::{Day, TimeOfDay},
 };
@@ -48,63 +48,51 @@ fn extract_meeting(meeting: &str) -> Option<(Day, TimeOfDay, TimeOfDay, Mode)> {
     ))
 }
 
-fn extract_and_check_meetings(times: &str, class_name: &str) -> Result<(Day, TimeOfDay, Mode)> {
-    let make_err = |msg| Error::BadClass {
-        name: class_name.into(),
-        err: msg,
-    };
-
+fn extract_and_check_meetings(times: &str) -> Result<(Day, TimeOfDay, Mode)> {
     let (tut_meeting, lab_meeting) = times
         .split("; ")
         .collect_tuple()
-        .ok_or_else(|| make_err(format!("class time {times:?} doesn't have two meetings")))?;
+        .ok_or_else(|| anyhow!("class time {times:?} doesn't have two meetings"))?;
 
     let (tut_day, tut_start, tut_end, tut_mode) = extract_meeting(tut_meeting)
-        .ok_or_else(|| make_err(format!("bad tutorial meeting {tut_meeting:?}")))?;
+        .ok_or_else(|| anyhow!("bad tutorial meeting {tut_meeting:?}"))?;
 
-    let (lab_day, lab_start, lab_end, lab_mode) = extract_meeting(lab_meeting)
-        .ok_or_else(|| make_err(format!("bad lab meeting {lab_meeting:?}")))?;
+    let (lab_day, lab_start, lab_end, lab_mode) =
+        extract_meeting(lab_meeting).ok_or_else(|| anyhow!("bad lab meeting {lab_meeting:?}"))?;
 
     if tut_day != lab_day {
-        Err(make_err("mismatch between tut and lab days".into()))?
+        bail!("mismatch between tut and lab days");
     } else if tut_start.add_hr(TUT_DURATION_HOURS) != tut_end {
-        Err(make_err("tut is the wrong length".into()))?
+        bail!("tut is the wrong length");
     } else if tut_end != lab_start {
-        Err(make_err("lab is not immediately after tut".into()))?
+        bail!("lab is not immediately after tut");
     } else if lab_start.add_hr(LAB_DURATION_HOURS) != lab_end {
-        Err(make_err("lab is the wrong length".into()))?
+        bail!("lab is the wrong length");
     } else if lab_mode != tut_mode {
-        Err(make_err("tut and lab mode disagree".into()))?
+        bail!("tut and lab mode disagree");
     } else {
         Ok((tut_day, tut_start, tut_mode))
     }
 }
 
 impl<'a> TryFrom<TsvRow<'a>> for Class {
-    type Error = Box<Error>;
+    type Error = anyhow::Error;
 
     fn try_from(row: TsvRow<'a>) -> Result<Self> {
         let name = String::from(row.get("section")?.trim());
 
         let class_type = row.get("type")?.trim();
         if class_type != "TLB" {
-            Err(Error::BadClass {
-                name: name.clone(),
-                err: format!("bad class type {class_type:?}, expected \"TLB\""),
-            })?;
+            bail!("bad class type {class_type:?} for {name}, expected \"TLB\"");
         }
 
         let status = row.get("status")?.trim();
         if status != "Open" && status != "Full" {
-            Err(Error::BadClass {
-                name: name.clone(),
-                err: format!(
-                    "bad class status {status:?}, either manually change to \"Open\" or remove it"
-                ),
-            })?;
+            bail!("bad class status {status:?} for {name}, either manually change to \"Open\" or remove it");
         }
 
-        let (day, start, mode) = extract_and_check_meetings(row.get("times")?.trim(), &name)?;
+        let (day, start, mode) = extract_and_check_meetings(row.get("times")?.trim())
+            .with_context(|| format!("error while extracting meeting info for {name}"))?;
 
         Ok(Class {
             name,

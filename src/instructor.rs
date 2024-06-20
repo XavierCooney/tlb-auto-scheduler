@@ -1,10 +1,9 @@
+use anyhow::{anyhow, Context, Result};
+
 use crate::{
-    errors::{Error, Result},
     tsv::{Tsv, TsvRow},
     utils::parse_bool_input,
 };
-
-const ZID_FIELD: &str = "zid";
 
 #[derive(Debug)]
 pub struct Instructor {
@@ -32,14 +31,18 @@ pub struct TutorSeniority {
 }
 
 impl<'a> TryFrom<TsvRow<'a>> for Instructor {
-    type Error = Box<Error>;
+    type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
         let name = row.get("name")?.into();
-        let zid = row.get(ZID_FIELD)?.into();
+        let zid = row.get("zid")?.into();
 
-        let class_type_requirement = row.try_into()?;
-        let seniority = row.try_into()?;
+        let class_type_requirement = row
+            .try_into()
+            .with_context(|| anyhow!("could not parse class requirements for {zid} ({name})"))?;
+        let seniority = row
+            .try_into()
+            .with_context(|| anyhow!("could not parse seniority status for {zid} ({name})"))?;
 
         Ok(Instructor {
             name,
@@ -57,19 +60,13 @@ impl Instructor {
 }
 
 impl<'a> TryFrom<TsvRow<'a>> for ClassTypeRequirement {
-    type Error = Box<Error>;
+    type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
-        let zid = row.get(ZID_FIELD)?;
-
         let get_requirement = |field: &str| {
-            row.get(field)?.parse::<u8>().map_err(|err| {
-                Box::new(Error::BadClassTypeRequirement {
-                    zid: zid.into(),
-                    field: field.into(),
-                    err,
-                })
-            })
+            row.get(field)?
+                .parse::<u8>()
+                .with_context(|| anyhow!("could not parse value of field {field} as number"))
         };
 
         Ok(ClassTypeRequirement {
@@ -84,7 +81,7 @@ impl<'a> TryFrom<TsvRow<'a>> for ClassTypeRequirement {
 }
 
 impl<'a> TryFrom<TsvRow<'a>> for Option<TutorSeniority> {
-    type Error = Box<Error>;
+    type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
         let senior_tutor_raw = row.get("senior tutor");

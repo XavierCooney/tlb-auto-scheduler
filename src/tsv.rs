@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, ops::Range, path::Path};
 
-use crate::errors::{Error, Result};
+use anyhow::{anyhow, bail, Context, Result};
 
 pub struct Tsv {
     _header_fields: Vec<String>,
@@ -48,13 +48,9 @@ impl<'a> TsvRow<'a> {
     pub fn get(&'a self, field: &str) -> Result<&'a str> {
         // This isn't super fast.. but because it's just used
         // during the input phase that doesn't matter much.
-        let index = *self
-            .tsv
-            .header_to_index
-            .get(field)
-            .ok_or_else(|| Error::MissingTsvField {
-                tsv_path: String::from(&self.tsv.path),
-                field: field.into(),
+        let index =
+            *self.tsv.header_to_index.get(field).ok_or_else(|| {
+                anyhow!("TSV file {} is missing the field {field:?}", self.tsv.path)
             })?;
 
         Ok(&self.tsv.rows[self.index][index])
@@ -70,12 +66,10 @@ impl Tsv {
         let path_lossy = path.to_string_lossy();
 
         let file_contents =
-            fs::read_to_string(path).map_err(|io_error| Error::FailedToReadTsv {
-                tsv_path: (&*path_lossy).into(),
-                io_error,
-            })?;
+            fs::read_to_string(path).with_context(|| "failed to read TSV at {path}")?;
 
         Self::try_from_str(&path_lossy, &file_contents)
+            .with_context(|| anyhow!("could not parse {path_lossy} as a TSV"))
     }
 
     pub fn try_from_str(path: &str, value: &str) -> Result<Self> {
@@ -95,12 +89,11 @@ impl Tsv {
                 if fields.len() == header_fields.len() {
                     Ok(fields)
                 } else {
-                    Err(Box::new(Error::TsvNumFieldsMismatch {
-                        path: path.into(),
-                        header_len: header_fields.len(),
-                        row_len: fields.len(),
-                        row: line.into(),
-                    }))
+                    bail!(
+                        "line {line:?} has {} fields, but the header for {path} has {} fields",
+                        fields.len(),
+                        header_fields.len()
+                    )
                 }
             })
             .collect::<Result<_>>()?;

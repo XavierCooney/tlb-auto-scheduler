@@ -1,6 +1,6 @@
 use std::{result, str::FromStr};
 
-use crate::errors::{Error, Result};
+use anyhow::{bail, Result};
 
 fn match_ignore_case<T: Copy>(input: &str, cases: &[(&[&str], T)]) -> Option<T> {
     for (matches, value) in cases {
@@ -96,7 +96,5 @@ pub fn parse_bool_input(value: &str) -> Result<bool> {
         return Ok(false);
     }
 
-    Err(Error::BadBoolean {
-        value: value.into(),
-    })?
+    bail!("could not parse {value:?} as a boolean")
 }
