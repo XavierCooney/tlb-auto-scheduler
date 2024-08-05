@@ -44,10 +44,18 @@ pub struct TutorSeniority {
     pub is_new_tutor: bool,
 }
 
-impl<'a> TryFrom<TsvRow<'a>> for Instructor {
+impl<'a> TryFrom<TsvRow<'a>> for Option<Instructor> {
     type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
+        if let Ok(ignore) = row.get("ignore") {
+            if !ignore.trim().is_empty()
+                && parse_bool_input(ignore).context("bad ignore on instructor")?
+            {
+                return Ok(None);
+            }
+        }
+
         // instructor_id is set in Instructor::vec_from_tsv
         let instructor_id = InstructorId::default();
 
@@ -61,13 +69,13 @@ impl<'a> TryFrom<TsvRow<'a>> for Instructor {
             .try_into()
             .with_context(|| anyhow!("could not parse seniority status for {zid} ({name})"))?;
 
-        Ok(Instructor {
+        Ok(Some(Instructor {
             instructor_id,
             name,
             zid,
             class_type_requirement,
             seniority,
-        })
+        }))
     }
 }
 
@@ -75,9 +83,10 @@ impl Instructor {
     pub fn vec_from_tsv(tsv: &Tsv) -> Result<Vec<Instructor>> {
         Ok(tsv
             .into_iter()
-            .map(Instructor::try_from)
+            .map(Option::<Instructor>::try_from)
             .collect::<Result<Vec<_>>>()?
             .into_iter()
+            .flatten()
             .enumerate()
             .map(|(idx, mut instructor)| {
                 instructor.instructor_id = InstructorId(idx as _);

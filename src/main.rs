@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use availabilities::AvailabilityMatrix;
 use checks::check_problem;
 use clap::Parser;
@@ -9,6 +9,7 @@ use costs::CostConfig;
 use evaluator::Problem;
 use initial_solution::get_initial_solution;
 use instructor::Instructor;
+use overrides::apply_overrides;
 use session::{classes_to_sessions, OverlapMatrix, OverlapRequirement};
 use solution_output::output_solution;
 use solver::{solve_once, SolverSeed};
@@ -23,6 +24,7 @@ mod evaluator;
 mod initial_solution;
 mod instructor;
 mod mutation;
+mod overrides;
 mod session;
 mod solution_output;
 mod solver;
@@ -88,7 +90,20 @@ fn main_impl() -> Result<()> {
         }
     }
 
-    let availabilities = AvailabilityMatrix::build(&instructors, &sessions, &applications)?;
+    let mut availabilities = AvailabilityMatrix::build(&instructors, &sessions, &applications)?;
+
+    let overrides_tsv_path = args.get_file_path("overrides.tsv");
+    if overrides_tsv_path.exists() {
+        apply_overrides(
+            &Tsv::read_from_path(&overrides_tsv_path)?,
+            &mut availabilities,
+            &instructors,
+            &sessions,
+        )
+        .context("Failed to process overrides")?;
+    } else {
+        println!("No overrides applied");
+    }
 
     drop(applications);
 

@@ -63,7 +63,7 @@ pub fn solve_once(problem: Problem, initial_solution: Solution, seed: SolverSeed
     for round_num in 0..seed.num_rounds {
         let reporting_interval = 10000;
         if round_num % reporting_interval == 0 {
-            logln!("After {round_num} rounds current cost is {current_cost:?}")
+            logln!("After {round_num:9} rounds current cost is {current_cost:?}")
         }
 
         let mutation = match Mutation::make_random(problem, &solution, &mut rng) {

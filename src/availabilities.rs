@@ -67,6 +67,16 @@ impl AvailabilityMatrix {
             [session.raw_index() * self.num_instructors + instructor.raw_index()]
     }
 
+    pub fn set_availability(
+        &mut self,
+        session: SessionId,
+        instructor: InstructorId,
+        updated: Availability,
+    ) {
+        self.availability_session_x_instructor
+            [session.raw_index() * self.num_instructors + instructor.raw_index()] = updated;
+    }
+
     pub fn make_availability_report(
         &self,
         sessions: &[Session],

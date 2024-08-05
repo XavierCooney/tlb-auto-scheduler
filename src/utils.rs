@@ -2,7 +2,7 @@ use std::{result, str::FromStr};
 
 use anyhow::{bail, Result};
 
-fn match_ignore_case<T: Copy>(input: &str, cases: &[(&[&str], T)]) -> Option<T> {
+pub fn match_ignore_case<T: Copy>(input: &str, cases: &[(&[&str], T)]) -> Option<T> {
     for (matches, value) in cases {
         if matches
             .iter()
