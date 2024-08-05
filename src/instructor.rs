@@ -5,8 +5,22 @@ use crate::{
     utils::parse_bool_input,
 };
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InstructorId(u16);
+
+impl InstructorId {
+    pub fn raw_index(self) -> usize {
+        self.0 as _
+    }
+
+    pub fn from_index(index: usize) -> Self {
+        InstructorId(index as _)
+    }
+}
+
 #[derive(Debug)]
 pub struct Instructor {
+    pub instructor_id: InstructorId,
     pub name: String,
     pub zid: String,
     pub class_type_requirement: ClassTypeRequirement,
@@ -34,6 +48,9 @@ impl<'a> TryFrom<TsvRow<'a>> for Instructor {
     type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
+        // instructor_id is set in Instructor::vec_from_tsv
+        let instructor_id = InstructorId::default();
+
         let name = row.get("name")?.into();
         let zid = row.get("zid")?.into();
 
@@ -45,6 +62,7 @@ impl<'a> TryFrom<TsvRow<'a>> for Instructor {
             .with_context(|| anyhow!("could not parse seniority status for {zid} ({name})"))?;
 
         Ok(Instructor {
+            instructor_id,
             name,
             zid,
             class_type_requirement,
@@ -55,7 +73,17 @@ impl<'a> TryFrom<TsvRow<'a>> for Instructor {
 
 impl Instructor {
     pub fn vec_from_tsv(tsv: &Tsv) -> Result<Vec<Instructor>> {
-        tsv.into_iter().map(Instructor::try_from).collect()
+        Ok(tsv
+            .into_iter()
+            .map(Instructor::try_from)
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .enumerate()
+            .map(|(idx, mut instructor)| {
+                instructor.instructor_id = InstructorId(idx as _);
+                instructor
+            })
+            .collect())
     }
 }
 
@@ -69,13 +97,28 @@ impl<'a> TryFrom<TsvRow<'a>> for ClassTypeRequirement {
                 .with_context(|| anyhow!("could not parse value of field {field} as number"))
         };
 
+        let get_requirement_or_default = |field: &str, default: u8| match row.get(field) {
+            Err(_) | Ok("-") => Ok(default),
+            Ok(val) => val
+                .parse::<u8>()
+                .with_context(|| anyhow!("could not parse value of field {field} as number")),
+        };
+
+        let min_tutes = get_requirement("minT")?;
+        let max_tutes = get_requirement("maxT")?;
+        let min_lab_assists = get_requirement("minA")?;
+        let max_lab_assists = get_requirement("maxA")?;
+
+        let min_total_classes = get_requirement_or_default("minC", min_tutes + min_lab_assists)?;
+        let max_total_classes = get_requirement_or_default("maxC", max_tutes + max_lab_assists)?;
+
         Ok(ClassTypeRequirement {
-            min_tutes: get_requirement("minT")?,
-            max_tutes: get_requirement("maxT")?,
-            min_lab_assists: get_requirement("minA")?,
-            max_lab_assists: get_requirement("maxA")?,
-            min_total_classes: get_requirement("minC")?,
-            max_total_classes: get_requirement("maxC")?,
+            min_tutes,
+            max_tutes,
+            min_lab_assists,
+            max_lab_assists,
+            min_total_classes,
+            max_total_classes,
         })
     }
 }

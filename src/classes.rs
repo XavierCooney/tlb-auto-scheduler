@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::{
     tsv::{Tsv, TsvRow},
-    utils::{Day, TimeOfDay},
+    utils::{parse_bool_input, Day, TimeOfDay},
 };
 
 pub const TUT_DURATION_HOURS: u8 = 1;
@@ -15,6 +15,9 @@ pub struct Class {
     pub day: Day,
     pub start: TimeOfDay,
     pub mode: Mode,
+
+    pub ignore_tut: bool,
+    pub ignore_lab: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -94,11 +97,26 @@ impl<'a> TryFrom<TsvRow<'a>> for Class {
         let (day, start, mode) = extract_and_check_meetings(row.get("times")?.trim())
             .with_context(|| format!("error while extracting meeting info for {name}"))?;
 
+        let get_ignore = |field_name: &str| {
+            Ok(match row.get(field_name) {
+                Ok(field_val) => {
+                    if field_val.trim().is_empty() {
+                        false
+                    } else {
+                        return parse_bool_input(field_val.trim());
+                    }
+                }
+                Err(_) => false,
+            })
+        };
+
         Ok(Class {
             name,
             day,
             start,
             mode,
+            ignore_tut: get_ignore("ignore tut")?,
+            ignore_lab: get_ignore("ignore lab")?,
         })
     }
 }

@@ -65,8 +65,8 @@ impl Tsv {
     pub fn read_from_path(path: &Path) -> Result<Self> {
         let path_lossy = path.to_string_lossy();
 
-        let file_contents =
-            fs::read_to_string(path).with_context(|| "failed to read TSV at {path}")?;
+        let file_contents = fs::read_to_string(path)
+            .with_context(|| anyhow!("failed to read TSV at {}", path.display()))?;
 
         Self::try_from_str(&path_lossy, &file_contents)
             .with_context(|| anyhow!("could not parse {path_lossy} as a TSV"))

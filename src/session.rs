@@ -7,29 +7,41 @@ use crate::{
     utils::{Day, SessionDuration, TimeOfDay},
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionType {
     TutLab,
     LabAssist,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SessionId(u16);
+
+impl SessionId {
+    pub fn raw_index(self) -> usize {
+        self.0 as _
+    }
+
+    pub fn from_index(index: usize) -> Self {
+        SessionId(index as _)
+    }
+}
 
 #[derive(Debug)]
 pub struct Session {
-    session_id: SessionId,
-    day: Day,
-    start_time: TimeOfDay,
-    duration: SessionDuration,
-    typ: SessionType,
-    mode: Mode,
-    class_name: Box<str>,
+    pub session_id: SessionId,
+    pub day: Day,
+    pub start_time: TimeOfDay,
+    pub duration: SessionDuration,
+    pub typ: SessionType,
+    pub mode: Mode,
+    pub class_name: Box<str>,
 }
 
 fn class_to_sessions(class: &Class) -> Vec<Session> {
-    vec![
-        Session {
+    let mut sessions = Vec::new();
+
+    if !class.ignore_tut {
+        sessions.push(Session {
             session_id: SessionId::default(),
             day: class.day,
             start_time: class.start,
@@ -37,8 +49,11 @@ fn class_to_sessions(class: &Class) -> Vec<Session> {
             typ: SessionType::TutLab,
             mode: class.mode,
             class_name: class.name.clone().into(),
-        },
-        Session {
+        });
+    }
+
+    if !class.ignore_lab {
+        sessions.push(Session {
             session_id: SessionId::default(),
             day: class.day,
             start_time: class.start.add_hr(TUT_DURATION_HOURS),
@@ -46,8 +61,10 @@ fn class_to_sessions(class: &Class) -> Vec<Session> {
             typ: SessionType::LabAssist,
             mode: class.mode,
             class_name: class.name.clone().into(),
-        },
-    ]
+        });
+    }
+
+    sessions
 }
 
 pub fn classes_to_sessions(classes: &[Class]) -> Vec<Session> {
@@ -66,12 +83,17 @@ pub fn classes_to_sessions(classes: &[Class]) -> Vec<Session> {
 pub enum OverlapRequirement {
     Sharp,
     WithPadding,
+    SameDay,
 }
 
 impl Session {
     fn overlaps_with(&self, other: &Session, mut requirement: OverlapRequirement) -> bool {
         if self.day != other.day {
             return false;
+        }
+
+        if matches!(requirement, OverlapRequirement::SameDay) {
+            return true;
         }
 
         if self.mode != other.mode {
@@ -104,17 +126,12 @@ impl Session {
 
     pub fn short_description(&self) -> String {
         format!(
-            "session {} ({} {}{})",
-            self.session_id.0,
+            "{} {}",
             self.class_name,
             match self.typ {
                 SessionType::TutLab => "tut+lab",
                 SessionType::LabAssist => "lab",
-            },
-            match self.mode {
-                Mode::Online => ", online",
-                Mode::F2F => "",
-            },
+            }
         )
     }
 }
@@ -136,6 +153,10 @@ impl OverlapMatrix {
 
         for session_1 in sessions {
             for session_2 in sessions {
+                if session_1.session_id == session_2.session_id {
+                    continue;
+                }
+
                 if session_1.overlaps_with(session_2, requirement) {
                     overlaps.insert(Self::get_overlap_index(
                         num_sessions,

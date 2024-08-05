@@ -1,3 +1,6 @@
 /target
 /jwt
 /config.*/
+/output
+/profile.json
+

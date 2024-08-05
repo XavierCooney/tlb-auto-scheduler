@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::{self, Write},
     path::Path,
@@ -6,6 +7,11 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::blocking::Client;
+
+use crate::{
+    classes::Mode,
+    utils::{Day, TimeOfDay},
+};
 
 fn talloc_api_current_term_endpoint() -> &'static str {
     "https://cgi.cse.unsw.edu.au/~talloc/api/v1/term/current"
@@ -20,7 +26,7 @@ fn talloc_api_applications_endpoint(term_id: &str) -> String {
 
 fn read_jwt() -> Result<String> {
     let jwt = fs::read_to_string("jwt")
-        .context("failed to read file `jwt` to get talloc ")?
+        .context("failed to read file `jwt` to get talloc token")?
         .trim()
         .to_string();
     if jwt.is_empty() {
@@ -32,8 +38,8 @@ fn read_jwt() -> Result<String> {
 fn make_request(client: &Client, endpoint: &str) -> Result<serde_json::Value> {
     let jwt = read_jwt().with_context(|| {
         "could not get JWT for talloc auth.\n".to_string()
-            + "you should get a talloc token from "
-            + "https://cgi.cse.unsw.edu.au/~talloc/admin/api and put it in the "
+            + "Hint: you should get a talloc token from\n"
+            + "  https://cgi.cse.unsw.edu.au/~talloc/admin/api\nand put it in the "
             + "file `jwt` in your current working directory."
     })?;
 
@@ -56,11 +62,11 @@ pub fn extract_talloc_term_id(term_info: serde_json::Value) -> Result<String> {
         .get("term_name")
         .context("couldn't extract term_name from term info")?;
 
-    println!("Using talloc application from term {term_name} (code {term_id})");
+    println!("Using talloc applications from term {term_name} (code {term_id})");
     Ok(term_id.to_string())
 }
 
-pub fn fetch_applications_value(json_cache: &Path) -> Result<serde_json::Value> {
+fn fetch_applications_value(json_cache: &Path) -> Result<serde_json::Value> {
     if json_cache.exists() {
         println!("Using cached talloc download at {}", json_cache.display());
 
@@ -103,5 +109,113 @@ pub fn fetch_applications_value(json_cache: &Path) -> Result<serde_json::Value> 
         println!("Cached download to {}", json_cache.display());
 
         Ok(applications)
+    }
+}
+
+fn group_talloc_by_applicant(
+    raw_json: serde_json::Value,
+) -> Result<HashMap<String, serde_json::Value>> {
+    let applicants = match raw_json {
+        serde_json::Value::Array(arr) => arr,
+        _ => bail!("outer talloc JSON is not an array"),
+    };
+
+    applicants
+        .into_iter()
+        .map(|mut application| {
+            let zid = application
+                .pointer("/profile/zid")
+                .with_context(|| anyhow!("application is missing a zid"))?
+                .as_str()
+                .context("profile.zid is not a string")?
+                .to_string();
+            Ok((
+                zid.to_string(),
+                application
+                    .get_mut("application")
+                    .with_context(|| anyhow!("{zid} does not have an associated application"))?
+                    .take(),
+            ))
+        })
+        .collect()
+}
+
+pub struct TallocApps {
+    applications: HashMap<String, serde_json::Value>,
+    ignore_no_application: bool,
+}
+
+impl TallocApps {
+    pub fn fetch(json_cache: &Path, ignore_no_application: bool) -> Result<Self> {
+        let raw_json = fetch_applications_value(json_cache)?;
+
+        Ok(TallocApps {
+            applications: group_talloc_by_applicant(raw_json).with_context(|| "bad talloc JSON")?,
+            ignore_no_application,
+        })
+    }
+
+    pub fn get_application<'a>(&'a self, zid: &str) -> Option<TallocApplication<'a>> {
+        match self.applications.get(zid) {
+            Some(application) => Some(TallocApplication::Application(application)),
+            None => self
+                .ignore_no_application
+                .then_some(TallocApplication::NoApplication),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Availability {
+    Impossible,
+    Dislike,
+    Possible,
+    Preferred,
+}
+
+// #[derive(Clone, Copy)]
+// pub struct TallocApplication<'a> {
+//     application: &'a serde_json::Value,
+// }
+
+#[derive(Clone, Copy)]
+pub enum TallocApplication<'a> {
+    Application(&'a serde_json::Value),
+    NoApplication,
+}
+
+impl<'a> TallocApplication<'a> {
+    pub fn get_availability(&self, day: Day, time: TimeOfDay, mode: Mode) -> Option<Availability> {
+        let availability_key = format!("{}{:02}", day.short_lowercase(), time.as_24_hours());
+
+        let application = match self {
+            TallocApplication::Application(application) => application,
+            TallocApplication::NoApplication => return Some(Availability::Impossible),
+        };
+
+        let mut raw_availability = application
+            .get(availability_key)?
+            .as_str()?
+            .parse::<u8>()
+            .ok()?;
+
+        if mode == Mode::Online {
+            raw_availability >>= 2;
+        }
+
+        Some(match raw_availability & 0b11 {
+            0 => Availability::Impossible,
+            1 => Availability::Dislike,
+            2 => Availability::Possible,
+            3 => Availability::Preferred,
+            _ => return None,
+        })
+    }
+
+    pub fn is_default(&self) -> bool {
+        match self {
+            TallocApplication::Application(_) => false,
+            TallocApplication::NoApplication => true,
+        }
     }
 }

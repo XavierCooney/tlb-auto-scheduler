@@ -41,8 +41,26 @@ impl FromStr for Day {
     }
 }
 
+impl Day {
+    pub fn short_lowercase(self) -> &'static str {
+        match self {
+            Day::Mon => "mon",
+            Day::Tue => "tue",
+            Day::Wed => "wed",
+            Day::Thu => "thu",
+            Day::Fri => "fri",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeOfDay(u8);
+
+impl TimeOfDay {
+    pub fn as_24_hours(self) -> u8 {
+        self.0
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct SessionDuration {
@@ -52,6 +70,10 @@ pub struct SessionDuration {
 impl SessionDuration {
     pub fn new(hours: u8) -> SessionDuration {
         SessionDuration { hours }
+    }
+
+    pub fn hours(self) -> u8 {
+        self.hours
     }
 }
 
@@ -97,4 +119,51 @@ pub fn parse_bool_input(value: &str) -> Result<bool> {
     }
 
     bail!("could not parse {value:?} as a boolean")
+}
+
+pub struct TwoCombIter<'a, T> {
+    slice: &'a [T],
+    outer_index: usize,
+    inner_index: usize,
+}
+
+impl<'a, T> TwoCombIter<'a, T> {
+    pub fn new(slice: &'a [T]) -> Self {
+        TwoCombIter {
+            slice,
+            outer_index: 1,
+            inner_index: 0,
+        }
+    }
+}
+
+impl<'a, T> Iterator for TwoCombIter<'a, T>
+where
+    T: Copy,
+{
+    type Item = (T, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (old_inner, old_outer) = (self.inner_index, self.outer_index);
+
+        if self.inner_index == self.outer_index {
+            self.outer_index += 1;
+            self.inner_index = 0;
+        } else {
+            self.inner_index += 1;
+        }
+
+        if old_outer < self.slice.len() {
+            Some((self.slice[old_inner], self.slice[old_outer]))
+        } else {
+            None
+        }
+    }
+}
+
+pub fn indent_lines(msg: &str, indentation: usize) -> String {
+    #[allow(clippy::format_collect)]
+    msg.lines()
+        .map(|line| format!("{}{line}\n", " ".repeat(indentation)))
+        .collect::<String>()
 }
