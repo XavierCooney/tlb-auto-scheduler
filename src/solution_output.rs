@@ -5,8 +5,14 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
+use itertools::Itertools;
 
-use crate::{evaluator::Problem, solver::SolverOutput, utils::indent_lines};
+use crate::{
+    evaluator::{Problem, Solution},
+    session::SessionType,
+    solver::SolverOutput,
+    utils::indent_lines,
+};
 
 impl<'a> Problem<'a> {
     pub fn details(&self) -> String {
@@ -37,6 +43,39 @@ impl<'a> Problem<'a> {
 
         result
     }
+}
+
+fn solution_output_tsv(problem: &Problem, solution: &Solution) -> String {
+    String::from("class\ttype\tzid\tname\n")
+        + &problem
+            .sessions
+            .iter()
+            .map(|session| {
+                let session_id = session.session_id;
+                let session = &problem.sessions[session_id.raw_index()];
+
+                let assigned = solution.assignment[session_id.raw_index()];
+
+                let instructor =
+                    assigned.map(|instructor_id| &problem.instructors[instructor_id.raw_index()]);
+
+                format!(
+                    "{}\t{}\t{}\t{}",
+                    session.class_name,
+                    match session.typ {
+                        SessionType::TutLab => "tut+lab",
+                        SessionType::LabAssist => "lab",
+                    },
+                    instructor
+                        .map(|instructor| instructor.zid.as_str())
+                        .unwrap_or("-"),
+                    instructor
+                        .map(|instructor| instructor.name.as_str())
+                        .unwrap_or("-"),
+                )
+            })
+            .join("\n")
+        + "\n"
 }
 
 static OUTPUTTER_MUTEX: Mutex<()> = Mutex::new(());
@@ -78,6 +117,11 @@ pub fn output_solution(problem: Problem, output: &SolverOutput) -> Result<()> {
                 output_dir.join("solver_log.txt").display()
             )
         })?;
+
+        fs::write(
+            output_dir.join("solution.tsv"),
+            solution_output_tsv(&problem, &output.solution),
+        )?;
     }
 
     println!(
