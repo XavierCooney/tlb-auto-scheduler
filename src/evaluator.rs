@@ -18,6 +18,8 @@ pub struct Problem<'a> {
     pub overlap_same_day: &'a OverlapMatrix,
 
     pub cost_config: &'a CostConfig,
+
+    pub initial_solution: &'a Solution,
 }
 
 #[derive(Default, Clone, PartialEq, Eq, Debug)]

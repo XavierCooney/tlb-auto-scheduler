@@ -35,6 +35,7 @@ pub enum Constraint {
     DirectOverlap,
     PaddedOverlap,
     SameDayOverlap,
+    MismatchedInitialSolution,
 }
 
 impl Constraint {
@@ -42,6 +43,7 @@ impl Constraint {
         Some(match self {
             Self::AssignedPreferred => CostPossibility::Value(0),
             Self::AssignedImpossible => CostPossibility::Infinity,
+            Self::MismatchedInitialSolution => CostPossibility::Value(0),
             _ => return None,
         })
     }

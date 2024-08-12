@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context, Result};
 use availabilities::AvailabilityMatrix;
@@ -10,6 +10,7 @@ use evaluator::Problem;
 use initial_solution::get_initial_solution;
 use instructor::Instructor;
 use overrides::apply_overrides;
+use scoped_threadpool::Pool;
 use session::{classes_to_sessions, OverlapMatrix, OverlapRequirement};
 use solution_output::output_solution;
 use solver::{solve_once, SolverSeed};
@@ -38,6 +39,10 @@ struct Args {
     config_dir: PathBuf,
     #[arg(long)]
     ignore_no_talloc: bool,
+    #[arg(long, default_value_t = 1)]
+    cpus: u32,
+    #[arg(long)]
+    initial_costs: bool,
 }
 
 impl Args {
@@ -93,6 +98,9 @@ fn main_impl() -> Result<()> {
 
     let mut availabilities = AvailabilityMatrix::build(&instructors, &sessions, &applications)?;
 
+    // the applications are pretty big, so free up some memory now
+    drop(applications);
+
     let overrides_tsv_path = args.get_file_path("overrides.tsv");
     if overrides_tsv_path.exists() {
         apply_overrides(
@@ -106,9 +114,11 @@ fn main_impl() -> Result<()> {
         println!("No overrides applied");
     }
 
-    drop(applications);
-
     let cost_config = CostConfig::read_from_toml(&args.get_file_path("costs.toml"))?;
+
+    let initial_solution =
+        get_initial_solution(&args.get_file_path("initial.tsv"), &sessions, &instructors)
+            .context("Failed to process initial solution\n")?;
 
     let problem = Problem {
         sessions: &sessions,
@@ -118,47 +128,65 @@ fn main_impl() -> Result<()> {
         overlap_padded: &overlaps_padded,
         overlap_same_day: &overlaps_same_day,
         cost_config: &cost_config,
+        initial_solution: &initial_solution,
     };
-    println!();
     check_problem(problem);
 
-    let initial_solution = get_initial_solution(&args.get_file_path("initial.tsv"), problem)
-        .context("Failed to process initial solution\n")?;
-
-    if initial_solution.is_nontrivial {
-        println!(
-            "Breakdown of initial solution:{}",
+    if args.initial_costs {
+        print!(
+            "\nBreakdown of initial solution:\n{}",
             indent_lines(&initial_solution.evaluate(problem, None).0.to_string(), 4)
         );
     }
     println!();
 
-    let mut best_result = solve_once(
-        problem,
-        &initial_solution,
-        SolverSeed {
-            num_rounds: 1000000,
-            rng_seed: 4,
-        },
-    );
-    output_solution(problem, &best_result)?;
+    let mut thread_pool = Pool::new(args.cpus);
 
-    for i in 1..=10 {
-        let seed = SolverSeed {
-            num_rounds: 30000000,
-            rng_seed: i + 100,
-        };
-        let new_result = solve_once(problem, &initial_solution, seed);
-        if new_result.better_than(&best_result) {
-            output_solution(problem, &new_result)?;
-            best_result = new_result;
+    let best_result = &Mutex::new(None);
+    let initial_solution = &initial_solution;
+
+    let run_with_seed = |seed| {
+        let new_result = solve_once(problem, initial_solution, seed);
+        let mut best_result = best_result.lock().unwrap();
+
+        if new_result.better_than(best_result.as_ref()) {
+            output_solution(problem, &new_result).unwrap();
+            *best_result = Some(new_result);
         } else {
             println!(
                 "Did not get improvement from {seed:?} (cost {:?})",
                 new_result.final_cost
             )
         }
-    }
+    };
+
+    thread_pool.scoped(|pool_scope| {
+        pool_scope.execute(move || {
+            run_with_seed(SolverSeed {
+                num_rounds: 1000000,
+                rng_seed: 0,
+            });
+        });
+
+        for i in 0..=20 {
+            pool_scope.execute(move || {
+                run_with_seed(SolverSeed {
+                    num_rounds: 30000000,
+                    rng_seed: i + 100,
+                });
+            });
+        }
+    });
+
+    // let mut best_result = solve_once(
+    //     problem,
+    //     &initial_solution,
+    //     SolverSeed {
+    //         num_rounds: 1000000,
+    //         rng_seed: 4,
+    //     },
+    // );
+    // output_solution(problem, &best_result)?;
 
     Ok(())
 }

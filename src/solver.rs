@@ -19,11 +19,11 @@ pub struct SolverOutput {
 }
 
 impl SolverOutput {
-    pub fn better_than(&self, other: &SolverOutput) -> bool {
-        match (self.final_cost, other.final_cost) {
+    pub fn better_than(&self, other: Option<&SolverOutput>) -> bool {
+        match (self.final_cost, other.and_then(|output| output.final_cost)) {
             (None, None) => false,
-            (None, Some(_)) => true,
-            (Some(_), None) => false,
+            (None, Some(_)) => false,
+            (Some(_), None) => true,
             (Some(new), Some(old)) => new < old,
         }
     }

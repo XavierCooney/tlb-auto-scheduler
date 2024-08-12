@@ -1,4 +1,5 @@
 use crate::{
+    costs::Constraint,
     evaluator::Problem,
     instructor::{ClassTypeRequirement, Instructor},
     session::SessionType,
@@ -108,4 +109,12 @@ pub fn check_problem(problem: Problem) {
         total_actual_classes <= sum_maxC,
         "increase some of the instructor's maxC values or add more instructors"
     );
+
+    if problem
+        .cost_config
+        .should_count(Constraint::MismatchedInitialSolution)
+        && !problem.initial_solution.is_nontrivial
+    {
+        println!("Warning: mismatched_initial_solution used without an explicit initial solution!");
+    }
 }

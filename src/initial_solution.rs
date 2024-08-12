@@ -4,17 +4,22 @@ use anyhow::{anyhow, bail, Context, Result};
 use itertools::Itertools;
 
 use crate::{
-    evaluator::{Problem, Solution},
-    session::SessionType,
+    evaluator::Solution,
+    instructor::Instructor,
+    session::{Session, SessionType},
     tsv::Tsv,
 };
 
-pub fn get_initial_solution(initial_tsv_path: &Path, problem: Problem) -> Result<Solution> {
+pub fn get_initial_solution(
+    initial_tsv_path: &Path,
+    sessions: &[Session],
+    instructors: &[Instructor],
+) -> Result<Solution> {
     if !initial_tsv_path.is_file() {
         println!("Using empty initial solution");
-        Ok(Solution::empty(problem.sessions.len(), false))
+        Ok(Solution::empty(sessions.len(), false))
     } else {
-        let mut assignment = vec![None; problem.sessions.len()];
+        let mut assignment = vec![None; sessions.len()];
 
         for row in &Tsv::read_from_path(initial_tsv_path)? {
             let class_name = row.get("class")?;
@@ -29,8 +34,7 @@ pub fn get_initial_solution(initial_tsv_path: &Path, problem: Problem) -> Result
                 continue;
             };
 
-            let (instructor_id,) = problem
-                .instructors
+            let (instructor_id,) = instructors
                 .iter()
                 .filter(|instructor| instructor.zid == instructor_zid)
                 .map(|instructor| instructor.instructor_id)
@@ -39,8 +43,7 @@ pub fn get_initial_solution(initial_tsv_path: &Path, problem: Problem) -> Result
                     anyhow!("cannot find instructor {instructor_zid} for class {class_name}")
                 })?;
 
-            let (session_id,) = problem
-                .sessions
+            let (session_id,) = sessions
                 .iter()
                 .filter(|session| {
                     session.class_name.as_ref() == class_name && session.typ == class_type
