@@ -15,6 +15,7 @@ use solution_output::output_solution;
 use solver::{solve_once, SolverSeed};
 use talloc::TallocApps;
 use tsv::Tsv;
+use utils::indent_lines;
 
 mod availabilities;
 mod checks;
@@ -121,13 +122,21 @@ fn main_impl() -> Result<()> {
     println!();
     check_problem(problem);
 
-    let empty_solution = get_initial_solution(&args.get_file_path("initial.tsv"), problem)?;
+    let initial_solution = get_initial_solution(&args.get_file_path("initial.tsv"), problem)
+        .context("Failed to process initial solution\n")?;
+
+    if initial_solution.is_nontrivial {
+        println!(
+            "Breakdown of initial solution:{}",
+            indent_lines(&initial_solution.evaluate(problem, None).0.to_string(), 4)
+        );
+    }
+    println!();
 
     let mut best_result = solve_once(
         problem,
-        empty_solution.clone(),
+        &initial_solution,
         SolverSeed {
-            // num_rounds: 50000000,
             num_rounds: 1000000,
             rng_seed: 4,
         },
@@ -136,10 +145,10 @@ fn main_impl() -> Result<()> {
 
     for i in 1..=10 {
         let seed = SolverSeed {
-            num_rounds: 20000000,
+            num_rounds: 30000000,
             rng_seed: i + 100,
         };
-        let new_result = solve_once(problem, empty_solution.clone(), seed);
+        let new_result = solve_once(problem, &initial_solution, seed);
         if new_result.better_than(&best_result) {
             output_solution(problem, &new_result)?;
             best_result = new_result;

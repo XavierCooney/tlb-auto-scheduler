@@ -29,9 +29,9 @@ impl SolverOutput {
     }
 }
 
-pub fn solve_once(problem: Problem, initial_solution: Solution, seed: SolverSeed) -> SolverOutput {
+pub fn solve_once(problem: Problem, initial_solution: &Solution, seed: SolverSeed) -> SolverOutput {
     let mut rng = fastrand::Rng::with_seed(seed.rng_seed);
-    let mut solution = initial_solution;
+    let mut solution = initial_solution.clone();
 
     let mut current_cost = solution
         .evaluate(problem, None)

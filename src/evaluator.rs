@@ -22,6 +22,7 @@ pub struct Problem<'a> {
 
 #[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct Solution {
+    pub is_nontrivial: bool,
     pub assignment: Box<[Option<InstructorId>]>,
 }
 
@@ -30,14 +31,18 @@ pub struct EvalBuffer {
 }
 
 impl Solution {
-    pub fn empty(num_sessions: usize) -> Self {
+    pub fn empty(num_sessions: usize, is_nontrivial: bool) -> Self {
         Solution {
+            is_nontrivial,
             assignment: vec![None; num_sessions].into_boxed_slice(),
         }
     }
 
     pub fn new(assignment: Box<[Option<InstructorId>]>) -> Self {
-        Solution { assignment }
+        Solution {
+            is_nontrivial: true,
+            assignment,
+        }
     }
 
     pub fn evaluate(
