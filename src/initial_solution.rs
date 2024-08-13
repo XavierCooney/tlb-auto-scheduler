@@ -29,19 +29,25 @@ pub fn get_initial_solution(
                 bad_type => bail!("bad session type {:?} for {class_name}", bad_type),
             };
             let instructor_zid = row.get("zid")?;
+            let instructor_name = row.get("name")?;
 
             if instructor_zid == "-" {
                 continue;
             };
 
-            let (instructor_id,) = instructors
+            let (instructor,) = instructors
                 .iter()
                 .filter(|instructor| instructor.zid == instructor_zid)
-                .map(|instructor| instructor.instructor_id)
                 .collect_tuple()
                 .with_context(|| {
                     anyhow!("cannot find instructor {instructor_zid} for class {class_name}")
                 })?;
+
+            if instructor.name != instructor_name {
+                println!("Warning: initial solution for class {class_name} has {instructor_zid}'s name as \"{instructor_name}\" but it should be \"{}\"", instructor.name);
+            }
+
+            let instructor_id = instructor.instructor_id;
 
             let (session_id,) = sessions
                 .iter()

@@ -1,5 +1,6 @@
 use std::{
-    fs,
+    fmt::Write,
+    fs::{self},
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -43,6 +44,71 @@ impl<'a> Problem<'a> {
 
         result
     }
+}
+
+pub fn instructor_stats_from_solution(problem: &Problem, solution: &Solution) -> Result<String> {
+    let mut output = String::from("Instructor allocation stats:\n");
+
+    for instructor in problem.instructors {
+        writeln!(output, "{} ({})", instructor.name, instructor.zid)?;
+
+        let class_constraints = &instructor.class_type_requirement;
+        writeln!(
+            output,
+            "    Had minT = {}, maxT = {}, minA = {}, maxA = {}, minC = {}, maxC = {}",
+            class_constraints.min_tutes,
+            class_constraints.max_tutes,
+            class_constraints.min_lab_assists,
+            class_constraints.max_lab_assists,
+            class_constraints.min_total_classes,
+            class_constraints.max_total_classes
+        )?;
+
+        let matching_sessions = problem
+            .sessions
+            .iter()
+            .filter(|session| {
+                solution.assignment[session.session_id.raw_index()]
+                    == Some(instructor.instructor_id)
+            })
+            .collect::<Vec<_>>();
+
+        let actual_tutes = matching_sessions
+            .iter()
+            .filter(|session| matches!(session.typ, SessionType::TutLab))
+            .count();
+
+        let actual_labs = matching_sessions
+            .iter()
+            .filter(|session| matches!(session.typ, SessionType::LabAssist))
+            .count();
+
+        writeln!(
+            output,
+            "    Actual tutes = {}, actual labs = {}, actual classes = {}",
+            actual_tutes,
+            actual_labs,
+            matching_sessions.len()
+        )?;
+
+        for session in matching_sessions {
+            let var_name = writeln!(
+                output,
+                "    {} {}: {:?}",
+                session.class_name,
+                match session.typ {
+                    SessionType::TutLab => "T",
+                    SessionType::LabAssist => "L",
+                },
+                problem
+                    .availabilities
+                    .get_availability(session.session_id, instructor.instructor_id)
+            );
+            var_name?;
+        }
+    }
+
+    Ok(output)
 }
 
 fn solution_output_tsv(problem: &Problem, solution: &Solution) -> String {

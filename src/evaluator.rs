@@ -79,6 +79,19 @@ impl Solution {
                 }
                 None => costs.add_cost_1(Constraint::UnassignedSession),
             }
+
+            if problem
+                .cost_config
+                .should_count(Constraint::MismatchedInitialSolution)
+            {
+                if let Some(old_assignment) =
+                    problem.initial_solution.assignment[session.session_id.raw_index()]
+                {
+                    if Some(old_assignment) != assignment {
+                        costs.add_cost_1(Constraint::MismatchedInitialSolution);
+                    }
+                }
+            }
         }
 
         for (instructor, instructor_allocation) in

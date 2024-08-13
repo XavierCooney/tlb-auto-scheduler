@@ -1,0 +1,36 @@
+# The costs, per session allocation, based on the avaibility of the instructor.
+assigned_preferred = 0
+assigned_possible = 5
+assigned_dislike = 100
+assigned_impossible = 100000
+
+# The cost of just leaving a session not assigned to anyone.
+unassigned_session = 5000
+
+# The costs for violating a minT/minA/minC constraint.
+below_min_tut = 150
+below_min_lab = 150
+below_min_class = 150
+
+# The costs for violating a maxT/maxA/maxC constraint.
+above_max_tut = 3000
+above_max_lab = 3000
+above_max_class = 3000
+
+# The cost for assigning two sessions to the same instructor
+# which directly overlap.
+direct_overlap = 100000
+
+# The cost for assigning two sessions to the same instructor
+# which are directly adjacent with no break in-between.
+padded_overlap = 5
+
+# The cost for assigning two sessions to the same instructor
+# which are on the same day.
+same_day_overlap = 0
+
+# Set this to a small nonzero value (like 3) and supply an `initial.tsv`
+# with and old allocation to encourage the solver to minimise the number
+# of changes compared to that old solution (useful for processing swaps
+# after availability changes).
+mismatched_initial_solution = 0

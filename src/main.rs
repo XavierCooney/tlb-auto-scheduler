@@ -12,7 +12,7 @@ use instructor::Instructor;
 use overrides::apply_overrides;
 use scoped_threadpool::Pool;
 use session::{classes_to_sessions, OverlapMatrix, OverlapRequirement};
-use solution_output::output_solution;
+use solution_output::{instructor_stats_from_solution, output_solution};
 use solver::{solve_once, SolverSeed};
 use talloc::TallocApps;
 use tsv::Tsv;
@@ -133,9 +133,13 @@ fn main_impl() -> Result<()> {
     check_problem(problem);
 
     if args.initial_costs {
-        print!(
+        println!(
             "\nBreakdown of initial solution:\n{}",
             indent_lines(&initial_solution.evaluate(problem, None).0.to_string(), 4)
+        );
+        print!(
+            "{}",
+            instructor_stats_from_solution(&problem, &initial_solution)?
         );
     }
     println!();
@@ -161,9 +165,10 @@ fn main_impl() -> Result<()> {
     };
 
     thread_pool.scoped(|pool_scope| {
+        println!("Starting solving...");
         pool_scope.execute(move || {
             run_with_seed(SolverSeed {
-                num_rounds: 1000000,
+                num_rounds: 1_000_000,
                 rng_seed: 0,
             });
         });
@@ -171,22 +176,12 @@ fn main_impl() -> Result<()> {
         for i in 0..=20 {
             pool_scope.execute(move || {
                 run_with_seed(SolverSeed {
-                    num_rounds: 30000000,
+                    num_rounds: 30_000_000,
                     rng_seed: i + 100,
                 });
             });
         }
     });
-
-    // let mut best_result = solve_once(
-    //     problem,
-    //     &initial_solution,
-    //     SolverSeed {
-    //         num_rounds: 1000000,
-    //         rng_seed: 4,
-    //     },
-    // );
-    // output_solution(problem, &best_result)?;
 
     Ok(())
 }

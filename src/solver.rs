@@ -42,6 +42,7 @@ pub fn solve_once(problem: Problem, initial_solution: &Solution, seed: SolverSee
     macro_rules! logln {
         ( $( $args:expr ),* ) => {{
             writeln!(&mut log, $( $args ),* ).unwrap();
+            // println!($( $args ),* );
         }};
     }
 
@@ -61,7 +62,7 @@ pub fn solve_once(problem: Problem, initial_solution: &Solution, seed: SolverSee
     let mut eval_buffer_helper = None;
 
     for round_num in 0..seed.num_rounds {
-        let reporting_interval = 10000;
+        let reporting_interval = 25000;
         if round_num % reporting_interval == 0 {
             logln!("After {round_num:9} rounds current cost is {current_cost:?}")
         }
