@@ -10,12 +10,13 @@ use itertools::Itertools;
 
 use crate::{
     evaluator::{Problem, Solution},
+    instructor::InstructorId,
     session::SessionType,
     solver::SolverOutput,
     utils::indent_lines,
 };
 
-impl<'a> Problem<'a> {
+impl Problem<'_> {
     pub fn details(&self) -> String {
         let mut result = String::new();
 
@@ -144,6 +145,35 @@ fn solution_output_tsv(problem: &Problem, solution: &Solution) -> String {
         + "\n"
 }
 
+fn show_diff(problem: &Problem, solution: &Solution) -> String {
+    let mut output = String::from("Difference from initial solution:\n");
+
+    for session in problem.sessions {
+        let session_id = session.session_id;
+        let initial_assignment = problem.initial_solution.assignment[session_id.raw_index()];
+        let new_assignment = solution.assignment[session_id.raw_index()];
+
+        let show_instructor = |instructor_id: Option<InstructorId>| match instructor_id {
+            Some(instructor_id) => {
+                let instructor = &problem.instructors[instructor_id.raw_index()];
+                format!("{} ({})", instructor.name, instructor.zid)
+            }
+            None => String::from("no assignment"),
+        };
+
+        if initial_assignment != new_assignment {
+            output.push_str(&format!(
+                "    {}: {} ==> {}\n",
+                session.short_description(),
+                show_instructor(initial_assignment),
+                show_instructor(new_assignment)
+            ));
+        }
+    }
+
+    output
+}
+
 static OUTPUTTER_MUTEX: Mutex<()> = Mutex::new(());
 
 pub fn output_solution(problem: Problem, output: &SolverOutput) -> Result<()> {
@@ -188,6 +218,18 @@ pub fn output_solution(problem: Problem, output: &SolverOutput) -> Result<()> {
             output_dir.join("solution.tsv"),
             solution_output_tsv(&problem, &output.solution),
         )?;
+
+        fs::write(
+            output_dir.join("instructor_stats.txt"),
+            instructor_stats_from_solution(&problem, &output.solution)?,
+        )?;
+
+        if problem.initial_solution.is_nontrivial {
+            fs::write(
+                output_dir.join("diff.txt"),
+                show_diff(&problem, &output.solution),
+            )?;
+        }
     }
 
     println!(

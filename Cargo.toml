@@ -2,6 +2,7 @@
 name = "tlb_auto_scheduler"
 version = "0.1.0"
 edition = "2021"
+authors = ["Xavier Cooney"]
 
 [profile.release]
 codegen-units = 1

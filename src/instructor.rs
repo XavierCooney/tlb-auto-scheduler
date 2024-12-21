@@ -44,7 +44,7 @@ pub struct TutorSeniority {
     pub is_new_tutor: bool,
 }
 
-impl<'a> TryFrom<TsvRow<'a>> for Option<Instructor> {
+impl TryFrom<TsvRow<'_>> for Option<Instructor> {
     type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
@@ -96,7 +96,7 @@ impl Instructor {
     }
 }
 
-impl<'a> TryFrom<TsvRow<'a>> for ClassTypeRequirement {
+impl TryFrom<TsvRow<'_>> for ClassTypeRequirement {
     type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {
@@ -132,7 +132,7 @@ impl<'a> TryFrom<TsvRow<'a>> for ClassTypeRequirement {
     }
 }
 
-impl<'a> TryFrom<TsvRow<'a>> for Option<TutorSeniority> {
+impl TryFrom<TsvRow<'_>> for Option<TutorSeniority> {
     type Error = anyhow::Error;
 
     fn try_from(row: TsvRow) -> Result<Self> {

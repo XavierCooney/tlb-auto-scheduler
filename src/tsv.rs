@@ -1,3 +1,5 @@
+// I already had this code lying around.. but serde might've been nicer here
+
 use std::{collections::HashMap, fs, ops::Range, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};

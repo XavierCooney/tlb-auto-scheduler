@@ -33,10 +33,12 @@ fn check_instructor_class_reqs(instructor: &Instructor) {
     check_constraint!(minC <= maxC);
     check_constraint!(minT + minA <= maxC);
     check_constraint!(minC <= maxA + maxT);
+
+    check_constraint!(minT + minA <= minC);
+    check_constraint!(maxC <= maxA + maxT);
 }
 
 #[allow(non_snake_case)]
-
 pub fn check_problem(problem: Problem) {
     for instructor in problem.instructors {
         check_instructor_class_reqs(instructor);

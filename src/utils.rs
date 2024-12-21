@@ -137,7 +137,7 @@ impl<'a, T> TwoCombIter<'a, T> {
     }
 }
 
-impl<'a, T> Iterator for TwoCombIter<'a, T>
+impl<T> Iterator for TwoCombIter<'_, T>
 where
     T: Copy,
 {

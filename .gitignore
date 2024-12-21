@@ -1,6 +1,6 @@
 /target
 /jwt
 /config.*/
-/output
+/output*
 /profile.json
 stats.py

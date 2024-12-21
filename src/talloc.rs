@@ -14,12 +14,12 @@ use crate::{
 };
 
 fn talloc_api_current_term_endpoint() -> &'static str {
-    "https://cgi.cse.unsw.edu.au/~talloc/api/v1/term/current"
+    "https://talloc.cse.unsw.edu.au/api/v1/term/current"
 }
 
 fn talloc_api_applications_endpoint(term_id: &str) -> String {
     format!(
-        "https://cgi.cse.unsw.edu.au/~talloc/api/v1/terms/{}/applications",
+        "https://talloc.cse.unsw.edu.au/api/v1/terms/{}/applications",
         term_id
     )
 }
@@ -184,7 +184,7 @@ pub enum TallocApplication<'a> {
     NoApplication,
 }
 
-impl<'a> TallocApplication<'a> {
+impl TallocApplication<'_> {
     pub fn get_availability(&self, day: Day, time: TimeOfDay, mode: Mode) -> Option<Availability> {
         let availability_key = format!("{}{:02}", day.short_lowercase(), time.as_24_hours());
 

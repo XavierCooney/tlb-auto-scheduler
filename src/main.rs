@@ -43,6 +43,12 @@ struct Args {
     cpus: u32,
     #[arg(long)]
     initial_costs: bool,
+    #[arg(long)]
+    start_seed: Option<u64>,
+    #[arg(long, default_value_t = 20)]
+    total_attempts: u64,
+    #[arg(long, default_value_t = 75_000_000)]
+    num_rounds: u64,
 }
 
 impl Args {
@@ -166,18 +172,21 @@ fn main_impl() -> Result<()> {
 
     thread_pool.scoped(|pool_scope| {
         println!("Starting solving...");
-        pool_scope.execute(move || {
-            run_with_seed(SolverSeed {
-                num_rounds: 1_000_000,
-                rng_seed: 0,
-            });
-        });
 
-        for i in 0..=20 {
+        if args.start_seed.is_none() {
             pool_scope.execute(move || {
                 run_with_seed(SolverSeed {
-                    num_rounds: 30_000_000,
-                    rng_seed: i + 100,
+                    num_rounds: args.num_rounds / 20,
+                    rng_seed: 0,
+                });
+            });
+        }
+
+        for i in 0..args.total_attempts {
+            pool_scope.execute(move || {
+                run_with_seed(SolverSeed {
+                    num_rounds: args.num_rounds,
+                    rng_seed: args.start_seed.unwrap_or(1) + i,
                 });
             });
         }
